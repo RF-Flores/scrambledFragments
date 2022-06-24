@@ -54,120 +54,173 @@ import java.util.*;
  */
 public class RicardoFlores {
 
+    private final MatchData suffixData;
+    private final MatchData prefixData;
+
+    //Keep the maximally matched data
+    private final MatchData maxMatchStrData;
+
+    //String fragments list
+    LinkedList<String> orderedSplitStrings;
+
+    private RicardoFlores(LinkedList<String> orderedSplitStrings) {
+        this.suffixData = new MatchData(true);
+        this.prefixData = new MatchData(false);
+        this.maxMatchStrData = new MatchData(false);
+        this.orderedSplitStrings = orderedSplitStrings;
+    }
+
     public static void main(String[] args) throws IOException {
         try (BufferedReader in = new BufferedReader(new FileReader(args[0]))) {
             in.lines()
                     .map(RicardoFlores::reassemble)
-                   .forEach(System.out::println);
+                    .forEach(System.out::println);
         }
 
     }
 
-    private static String reassemble(String line) {
+    public static String reassemble(String line) {
         //Split by semicolon
         LinkedList<String> orderedSplitStrings = new LinkedList<>(Arrays.asList(line.split(";")));
         //order by length
-        orderedSplitStrings.sort(Comparator.comparingInt(String::length));
+        orderedSplitStrings.sort(Comparator.comparingInt(String::length).reversed());
         //get anchor str
-        String anchorText = orderedSplitStrings.removeLast();
+        String finalText = "";
 
-        RicardoFlores algorithmEngine = new RicardoFlores();
-        while(!orderedSplitStrings.isEmpty()) {
-            anchorText = algorithmEngine.execute(orderedSplitStrings,anchorText);
+        RicardoFlores algorithmEngine = new RicardoFlores(orderedSplitStrings);
+        while(orderedSplitStrings.size() > 1) {
+            finalText = algorithmEngine.execute();
         }
-        return anchorText;
+        return finalText;
     }
 
-    public String execute(LinkedList<String> orderedSplitStrings, String anchorText) {
-        //Keep the maximally matched data
-        MatchData maxMatchStrData = new MatchData();
-
-        //Matched data from the currentStr
-        MatchData suffixData = new MatchData();
-        MatchData prefixData = new MatchData();
-        prefixData.setSuffix(false);
-
-        int anchorLength;
-        String currentStr;
-        int currentStrLength;
-
-        for (int currentStrIndex = 0; currentStrIndex < orderedSplitStrings.size(); currentStrIndex ++) {
-            anchorLength = anchorText.length();
-            currentStr = orderedSplitStrings.get(currentStrIndex);
-            currentStrLength = currentStr.length();
-
-            //Matched data reset
-            prepareDataForNewStrIteration(suffixData, prefixData, anchorLength);
-            //looping over the string to figure out the max match as suffix and prefix
-            for(int characterIndex = 0; characterIndex < currentStrLength; characterIndex++) {
-                //Expected matched length
-                int numberOfCharactersToMatch = characterIndex + 1;
-
-                //Calculate anchor region start index for suffix
-                int anchorRegionMatchOffset = anchorLength - 1 - characterIndex;
-                //Suffix matching
-                if(anchorText.regionMatches(anchorRegionMatchOffset, currentStr, 0, numberOfCharactersToMatch)) {
-                    suffixData.setMaxMatch(numberOfCharactersToMatch);
-                    suffixData.setAnchorIdUpperSubstringIndex(anchorRegionMatchOffset);
-                }
-
-                //Calculate currentStr region start index for suffix
-                int currentStrRegionMatchOffset = currentStrLength - 1 - characterIndex;
-                //Prefix matching
-                if(anchorText.regionMatches(0, currentStr, currentStrRegionMatchOffset, numberOfCharactersToMatch)) {
-                    prefixData.setMaxMatch(numberOfCharactersToMatch);
-                    prefixData.setAnchorIdLowerSubstringIndex(numberOfCharactersToMatch);
-                }
-            }
-            if(suffixData.hasLongerMatch(maxMatchStrData)) {
-                suffixData.copyDataTo(maxMatchStrData);
-                maxMatchStrData.setStrIndexInList(currentStrIndex);
-            }
-            if(prefixData.hasLongerMatch(maxMatchStrData)) {
-                prefixData.copyDataTo(maxMatchStrData);
-                maxMatchStrData.setStrIndexInList(currentStrIndex);
+    private String execute(){
+        //remove unnecessary smaller fragments from list
+        removeUnnecessaryFragments();
+        for (int currentStrIndex = orderedSplitStrings.size() - 1; currentStrIndex > 0; currentStrIndex--) {
+            String currentString = orderedSplitStrings.get(currentStrIndex);
+            for (int otherStrIndex = currentStrIndex - 1; otherStrIndex >= 0; otherStrIndex--) {
+                String otherString = orderedSplitStrings.get(otherStrIndex);
+                calculateAndUpdateMaxRegionMatch(currentString, otherString, currentStrIndex, otherStrIndex);
             }
         }
-
-        return concatMaxMatchAndSanitizeList(orderedSplitStrings,anchorText,maxMatchStrData);
+        updateListWithMaxMatch();
+        maxMatchStrData.resetData();
+        return orderedSplitStrings.getLast();
     }
 
-    private void prepareDataForNewStrIteration(MatchData suffixData, MatchData prefixData, int anchorLength) {
+    private void updateListWithMaxMatch() {
+        if(orderedSplitStrings.size() == 1) return;
+        if(maxMatchStrData.getMaxMatch() == 0) {
+            noMatchesListUpdate();
+            return;
+        }
+        String leftSideText;
+        String rightSideText;
+        if(!maxMatchStrData.isSuffix()) {
+            leftSideText = orderedSplitStrings.remove(maxMatchStrData.getOtherStrIndexInList());
+            leftSideText = leftSideText.substring(0,leftSideText.length() - maxMatchStrData.getMaxMatch());
+            rightSideText = orderedSplitStrings.remove(maxMatchStrData.getCurrentStrIndexInList() - 1);
+        } else {
+            leftSideText = orderedSplitStrings.remove(maxMatchStrData.getCurrentStrIndexInList());
+            leftSideText = leftSideText.substring(0,leftSideText.length() - maxMatchStrData.getMaxMatch());
+            rightSideText = orderedSplitStrings.remove(maxMatchStrData.getOtherStrIndexInList());
+        }
+        orderedSplitStrings.add(leftSideText + rightSideText);
+    }
+
+    private void noMatchesListUpdate() {
+        String finalString = orderedSplitStrings.removeLast();
+        String firstString = orderedSplitStrings.getFirst();
+        //Despite any matching, bigger string reigns
+        finalString = firstString.length() > finalString.length() ? firstString : finalString;
+        orderedSplitStrings.clear();
+        orderedSplitStrings.add(finalString);
+    }
+
+    private void calculateAndUpdateMaxRegionMatch(String currentString, String otherString, int currentStringIndex, int otherStringIndex) {
+        prepareDataForNewStrIteration(suffixData, prefixData, currentString.length());
+        calculatePrefixAndSuffixMatch(currentString,otherString);
+        updateMaxMatchData(currentStringIndex, otherStringIndex);
+    }
+
+    private void updateMaxMatchData(int currentStrIndex, int otherStringIndex) {
+        if(suffixData.hasLongerMatch(maxMatchStrData) && suffixData.hasLongerMatch(prefixData)) {
+            suffixData.copyDataTo(maxMatchStrData);
+            maxMatchStrData.setOtherStrIndexInList(otherStringIndex);
+            maxMatchStrData.setCurrentStrIndexInList(currentStrIndex);
+        } else if (prefixData.hasLongerMatch(suffixData)) {
+            prefixData.copyDataTo(maxMatchStrData);
+            maxMatchStrData.setOtherStrIndexInList(otherStringIndex);
+            maxMatchStrData.setCurrentStrIndexInList(currentStrIndex);
+        }
+    }
+
+    private void calculatePrefixAndSuffixMatch(String currentString, String otherString) {
+        for(int characterIndex = 0; characterIndex < currentString.length(); characterIndex++) {
+            //Expected matched length
+            int numberOfCharactersToMatch = characterIndex + 1;
+
+            //Calculate anchor region start index for suffix
+            int anchorRegionMatchOffset = currentString.length() - 1 - characterIndex;
+            //Suffix matching
+            if(currentString.regionMatches(anchorRegionMatchOffset, otherString, 0, numberOfCharactersToMatch)) {
+                suffixData.setMaxMatch(numberOfCharactersToMatch);
+                //suffixData.setAnchorIdUpperSubstringIndex(anchorRegionMatchOffset);
+            }
+
+            //Calculate currentStr region start index for suffix
+            int currentStrRegionMatchOffset = otherString.length() - 1 - characterIndex;
+            //Prefix matching
+            if(currentString.regionMatches(0, otherString, currentStrRegionMatchOffset, numberOfCharactersToMatch)) {
+                prefixData.setMaxMatch(numberOfCharactersToMatch);
+                //prefixData.setAnchorIdLowerSubstringIndex(numberOfCharactersToMatch);
+            }
+        }
+    }
+
+    private void removeUnnecessaryFragments() {
+        for (int currentStrIndex = orderedSplitStrings.size() - 1; currentStrIndex > 0; currentStrIndex--) {
+            String currentString = orderedSplitStrings.get(currentStrIndex);
+            if(checkStringContainedInOtherString(currentString, currentStrIndex)) {
+                orderedSplitStrings.remove(currentStrIndex);
+            }
+        }
+    }
+
+    private boolean checkStringContainedInOtherString(String currentString, int currentStrIndex) {
+        for (int otherStrIndex = currentStrIndex - 1; otherStrIndex >= 0; otherStrIndex--) {
+            String otherString = orderedSplitStrings.get(otherStrIndex);
+            if (otherString.contains(currentString)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void prepareDataForNewStrIteration(MatchData suffixData, MatchData prefixData, int currentStrLength) {
         suffixData.resetData();
         //Anchor text substring starting index for suffix
         suffixData.setAnchorIdLowerSubstringIndex(0);
         prefixData.resetData();
         //Anchor text substring ending index for prefix
-        prefixData.setAnchorIdUpperSubstringIndex(anchorLength);
+        prefixData.setAnchorIdUpperSubstringIndex(currentStrLength);
     }
 
-    private String concatMaxMatchAndSanitizeList(LinkedList<String> orderedSplitStrings, String anchorText,
-                                                 MatchData maxMatchStrData) {
-        if(maxMatchStrData.getMaxMatch() == 0) {
-            //Edge case, fragments left do not match anchor as suffix or prefix
-            orderedSplitStrings.clear();
-            return anchorText;
-        }
-        String textToAdd = orderedSplitStrings.remove(maxMatchStrData.getStrIndexInList());
-        if(maxMatchStrData.getMaxMatch() == textToAdd.length()) {
-            //Edge case, max matching fragment is already present in anchor, no changes needed to anchor
-            return anchorText;
-        }
-        String cutAnchorText = anchorText.substring(
-                maxMatchStrData.getAnchorIdLowerSubstringIndex(),
-                maxMatchStrData.getAnchorIdUpperSubstringIndex());
-        return maxMatchStrData.isSuffix() ? cutAnchorText + textToAdd : textToAdd + cutAnchorText;
-    }
-
-    private class MatchData {
+    private static class MatchData {
         private int maxMatch = 0;
         private int anchorIdUpperSubstringIndex = 0;
         private int anchorIdLowerSubstringIndex = 0;
 
-        private boolean isSuffix = true;
+        private boolean isSuffix;
 
         //Only required for max Match
-        private int strIndexInList = 0;
+        private int otherStrIndexInList = 0;
+        private int currentStrIndexInList = 0;
+
+        public MatchData(boolean isSuffix) {
+            this.isSuffix = isSuffix;
+        }
 
         public int getMaxMatch() {
             return maxMatch;
@@ -201,12 +254,20 @@ public class RicardoFlores {
             isSuffix = suffix;
         }
 
-        public int getStrIndexInList() {
-            return strIndexInList;
+        public int getOtherStrIndexInList() {
+            return otherStrIndexInList;
         }
 
-        public void setStrIndexInList(int strIndexInList) {
-            this.strIndexInList = strIndexInList;
+        public void setOtherStrIndexInList(int otherStrIndexInList) {
+            this.otherStrIndexInList = otherStrIndexInList;
+        }
+
+        public int getCurrentStrIndexInList() {
+            return currentStrIndexInList;
+        }
+
+        public void setCurrentStrIndexInList(int currentStrIndexInList) {
+            this.currentStrIndexInList = currentStrIndexInList;
         }
 
         //Methods
