@@ -88,6 +88,10 @@ public class RicardoFlores {
         String finalText = "";
 
         RicardoFlores algorithmEngine = new RicardoFlores(orderedSplitStrings);
+        algorithmEngine.removeUnnecessaryFragments();
+        if(orderedSplitStrings.size() <= 1) {
+            return orderedSplitStrings.removeFirst();
+        }
         while(orderedSplitStrings.size() > 1) {
             finalText = algorithmEngine.execute();
         }
@@ -95,28 +99,17 @@ public class RicardoFlores {
     }
 
     private String execute(){
-        //remove unnecessary smaller fragments from list
-        removeUnnecessaryFragments();
-        //maxMatchStrData.resetData();
-        boolean wasCalculated = false;
+        maxMatchStrData.resetData();
         for (int currentStrIndex = orderedSplitStrings.size() - 1; currentStrIndex > 0; currentStrIndex--) {
             String currentString = orderedSplitStrings.get(currentStrIndex);
             for (int otherStrIndex = currentStrIndex - 1; otherStrIndex >= 0; otherStrIndex--) {
                 String otherString = orderedSplitStrings.get(otherStrIndex);
                 if(maxMatchStrData.getMaxMatch() > currentString.length()) break;
+                calculateAndUpdateMaxRegionMatch(currentString, otherString, currentStrIndex, otherStrIndex);
             }
         }
         updateListWithMaxMatch();
         return orderedSplitStrings.getLast();
-    }
-
-    private void removeDuplicateFragmentsUpdateMatch(String currentString, String otherString) {
-        if(currentString.length() > otherString.length()) {
-            orderedSplitStrings.removeLastOccurrence(otherString);
-            maxMatchStrData.setCurrentStrIndexInList(maxMatchStrData.getCurrentStrIndexInList() - 1);
-            return;
-        }
-        orderedSplitStrings.removeLastOccurrence(currentString);
     }
 
     private void updateListWithMaxMatch() {
@@ -148,14 +141,10 @@ public class RicardoFlores {
         orderedSplitStrings.add(finalString);
     }
 
-    private boolean calculateAndUpdateMaxRegionMatch(String currentString, String otherString, int currentStringIndex, int otherStringIndex) {
-        prepareDataForNewStrIteration(suffixData, prefixData, currentString.length());
-        if(calculatePrefixAndSuffixMatch(currentString,otherString)) {
-            updateMaxMatchData(currentStringIndex, otherStringIndex);
-            return true;
-        }
-
-        return false;
+    private void calculateAndUpdateMaxRegionMatch(String currentString, String otherString, int currentStringIndex, int otherStringIndex) {
+        prepareDataForNewStrIteration(suffixData, prefixData);
+        calculatePrefixAndSuffixMatch(currentString,otherString);
+        updateMaxMatchData(currentStringIndex, otherStringIndex);
     }
 
     private void updateMaxMatchData(int currentStrIndex, int otherStringIndex) {
@@ -170,8 +159,7 @@ public class RicardoFlores {
         }
     }
 
-    private boolean calculatePrefixAndSuffixMatch(String currentString, String otherString) {
-        if(currentString.contains(otherString) || otherString.contains(currentString)) return false;
+    private void calculatePrefixAndSuffixMatch(String currentString, String otherString) {
         for(int characterIndex = 0; characterIndex < currentString.length(); characterIndex++) {
             //Expected matched length
             int numberOfCharactersToMatch = characterIndex + 1;
@@ -190,29 +178,22 @@ public class RicardoFlores {
                 prefixData.setMaxMatch(numberOfCharactersToMatch);
             }
         }
-        return true;
     }
 
     private void removeUnnecessaryFragments() {
         for (int currentStrIndex = orderedSplitStrings.size() - 1; currentStrIndex > 0; currentStrIndex--) {
             String currentString = orderedSplitStrings.get(currentStrIndex);
-            if(checkStringContainedInOtherString(currentString, currentStrIndex)) {
-                orderedSplitStrings.remove(currentStrIndex);
+            for(Iterator<String> iterator = orderedSplitStrings.iterator(); iterator.hasNext();) {
+                String otherString = iterator.next();
+                if(currentString.contains(otherString) && !currentString.equals(otherString)) {
+                    iterator.remove();
+                    currentStrIndex--;
+                }
             }
         }
     }
 
-    private boolean checkStringContainedInOtherString(String currentString, int currentStrIndex) {
-        for (int otherStrIndex = currentStrIndex - 1; otherStrIndex >= 0; otherStrIndex--) {
-            String otherString = orderedSplitStrings.get(otherStrIndex);
-            if (otherString.contains(currentString)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void prepareDataForNewStrIteration(MatchData suffixData, MatchData prefixData, int currentStrLength) {
+    private void prepareDataForNewStrIteration(MatchData suffixData, MatchData prefixData) {
         suffixData.resetData();
         prefixData.resetData();
     }
