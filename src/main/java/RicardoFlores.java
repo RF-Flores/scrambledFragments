@@ -89,13 +89,10 @@ public class RicardoFlores {
 
         RicardoFlores algorithmEngine = new RicardoFlores(orderedSplitStrings);
         algorithmEngine.removeUnnecessaryFragments();
-        if(orderedSplitStrings.size() <= 1) {
-            return orderedSplitStrings.removeFirst();
-        }
         while(orderedSplitStrings.size() > 1) {
             finalText = algorithmEngine.execute();
         }
-        return finalText;
+        return orderedSplitStrings.size() == 1 ? orderedSplitStrings.removeFirst() : finalText;
     }
 
     private String execute(){
