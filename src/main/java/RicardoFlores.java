@@ -161,17 +161,17 @@ public class RicardoFlores {
             //Expected matched length
             int numberOfCharactersToMatch = characterIndex + 1;
 
-            //Calculate anchor region start index for suffix
-            int anchorRegionMatchOffset = currentString.length() - 1 - characterIndex;
             //Suffix matching
-            if(currentString.regionMatches(anchorRegionMatchOffset, otherString, 0, numberOfCharactersToMatch)) {
+            //Calculate right side string start index for suffix
+            int rightSideStringMatchOffset = currentString.length() - 1 - characterIndex;
+            if(currentString.regionMatches(rightSideStringMatchOffset, otherString, 0, numberOfCharactersToMatch)) {
                 suffixData.setMaxMatch(numberOfCharactersToMatch);
             }
 
-            //Calculate currentStr region start index for suffix
-            int currentStrRegionMatchOffset = otherString.length() - 1 - characterIndex;
             //Prefix matching
-            if(currentString.regionMatches(0, otherString, currentStrRegionMatchOffset, numberOfCharactersToMatch)) {
+            //Calculate left side string start index for prefix
+            int leftStringMatchOffset = otherString.length() - 1 - characterIndex;
+            if(currentString.regionMatches(0, otherString, leftStringMatchOffset, numberOfCharactersToMatch)) {
                 prefixData.setMaxMatch(numberOfCharactersToMatch);
             }
         }
