@@ -83,7 +83,7 @@ public class RicardoFlores {
         //Split by semicolon
         LinkedList<String> orderedSplitStrings = new LinkedList<>(Arrays.asList(line.split(";")));
         //order by length
-        orderedSplitStrings.sort(Comparator.comparingInt(String::length).reversed());
+        orderedSplitStrings.sort(Comparator.comparingInt(String::length));
         //get anchor str
         String finalText = "";
 
@@ -97,20 +97,30 @@ public class RicardoFlores {
     private String execute(){
         //remove unnecessary smaller fragments from list
         removeUnnecessaryFragments();
+        //maxMatchStrData.resetData();
+        boolean wasCalculated = false;
         for (int currentStrIndex = orderedSplitStrings.size() - 1; currentStrIndex > 0; currentStrIndex--) {
             String currentString = orderedSplitStrings.get(currentStrIndex);
             for (int otherStrIndex = currentStrIndex - 1; otherStrIndex >= 0; otherStrIndex--) {
                 String otherString = orderedSplitStrings.get(otherStrIndex);
-                calculateAndUpdateMaxRegionMatch(currentString, otherString, currentStrIndex, otherStrIndex);
+                if(maxMatchStrData.getMaxMatch() > currentString.length()) break;
             }
         }
         updateListWithMaxMatch();
-        maxMatchStrData.resetData();
         return orderedSplitStrings.getLast();
     }
 
+    private void removeDuplicateFragmentsUpdateMatch(String currentString, String otherString) {
+        if(currentString.length() > otherString.length()) {
+            orderedSplitStrings.removeLastOccurrence(otherString);
+            maxMatchStrData.setCurrentStrIndexInList(maxMatchStrData.getCurrentStrIndexInList() - 1);
+            return;
+        }
+        orderedSplitStrings.removeLastOccurrence(currentString);
+    }
+
     private void updateListWithMaxMatch() {
-        if(orderedSplitStrings.size() == 1) return;
+        if(orderedSplitStrings.size() <= 1) return;
         if(maxMatchStrData.getMaxMatch() == 0) {
             noMatchesListUpdate();
             return;
@@ -131,17 +141,21 @@ public class RicardoFlores {
 
     private void noMatchesListUpdate() {
         String finalString = orderedSplitStrings.removeLast();
-        String firstString = orderedSplitStrings.getFirst();
-        //Despite any matching, bigger string reigns
-        finalString = firstString.length() > finalString.length() ? firstString : finalString;
+        String biggestStringInList = orderedSplitStrings.getLast();
+        //Despite any matching, biggest string reigns.
+        finalString = biggestStringInList.length() > finalString.length() ? biggestStringInList : finalString;
         orderedSplitStrings.clear();
         orderedSplitStrings.add(finalString);
     }
 
-    private void calculateAndUpdateMaxRegionMatch(String currentString, String otherString, int currentStringIndex, int otherStringIndex) {
+    private boolean calculateAndUpdateMaxRegionMatch(String currentString, String otherString, int currentStringIndex, int otherStringIndex) {
         prepareDataForNewStrIteration(suffixData, prefixData, currentString.length());
-        calculatePrefixAndSuffixMatch(currentString,otherString);
-        updateMaxMatchData(currentStringIndex, otherStringIndex);
+        if(calculatePrefixAndSuffixMatch(currentString,otherString)) {
+            updateMaxMatchData(currentStringIndex, otherStringIndex);
+            return true;
+        }
+
+        return false;
     }
 
     private void updateMaxMatchData(int currentStrIndex, int otherStringIndex) {
@@ -149,14 +163,15 @@ public class RicardoFlores {
             suffixData.copyDataTo(maxMatchStrData);
             maxMatchStrData.setOtherStrIndexInList(otherStringIndex);
             maxMatchStrData.setCurrentStrIndexInList(currentStrIndex);
-        } else if (prefixData.hasLongerMatch(suffixData)) {
+        } else if (prefixData.hasLongerMatch(maxMatchStrData)) {
             prefixData.copyDataTo(maxMatchStrData);
             maxMatchStrData.setOtherStrIndexInList(otherStringIndex);
             maxMatchStrData.setCurrentStrIndexInList(currentStrIndex);
         }
     }
 
-    private void calculatePrefixAndSuffixMatch(String currentString, String otherString) {
+    private boolean calculatePrefixAndSuffixMatch(String currentString, String otherString) {
+        if(currentString.contains(otherString) || otherString.contains(currentString)) return false;
         for(int characterIndex = 0; characterIndex < currentString.length(); characterIndex++) {
             //Expected matched length
             int numberOfCharactersToMatch = characterIndex + 1;
@@ -166,7 +181,6 @@ public class RicardoFlores {
             //Suffix matching
             if(currentString.regionMatches(anchorRegionMatchOffset, otherString, 0, numberOfCharactersToMatch)) {
                 suffixData.setMaxMatch(numberOfCharactersToMatch);
-                //suffixData.setAnchorIdUpperSubstringIndex(anchorRegionMatchOffset);
             }
 
             //Calculate currentStr region start index for suffix
@@ -174,9 +188,9 @@ public class RicardoFlores {
             //Prefix matching
             if(currentString.regionMatches(0, otherString, currentStrRegionMatchOffset, numberOfCharactersToMatch)) {
                 prefixData.setMaxMatch(numberOfCharactersToMatch);
-                //prefixData.setAnchorIdLowerSubstringIndex(numberOfCharactersToMatch);
             }
         }
+        return true;
     }
 
     private void removeUnnecessaryFragments() {
@@ -200,17 +214,11 @@ public class RicardoFlores {
 
     private void prepareDataForNewStrIteration(MatchData suffixData, MatchData prefixData, int currentStrLength) {
         suffixData.resetData();
-        //Anchor text substring starting index for suffix
-        suffixData.setAnchorIdLowerSubstringIndex(0);
         prefixData.resetData();
-        //Anchor text substring ending index for prefix
-        prefixData.setAnchorIdUpperSubstringIndex(currentStrLength);
     }
 
     private static class MatchData {
         private int maxMatch = 0;
-        private int anchorIdUpperSubstringIndex = 0;
-        private int anchorIdLowerSubstringIndex = 0;
 
         private boolean isSuffix;
 
@@ -228,22 +236,6 @@ public class RicardoFlores {
 
         public void setMaxMatch(int maxMatch) {
             this.maxMatch = maxMatch;
-        }
-
-        public int getAnchorIdUpperSubstringIndex() {
-            return anchorIdUpperSubstringIndex;
-        }
-
-        public void setAnchorIdUpperSubstringIndex(int anchorIdUpperSubstringIndex) {
-            this.anchorIdUpperSubstringIndex = anchorIdUpperSubstringIndex;
-        }
-
-        public int getAnchorIdLowerSubstringIndex() {
-            return anchorIdLowerSubstringIndex;
-        }
-
-        public void setAnchorIdLowerSubstringIndex(int anchorIdLowerSubstringIndex) {
-            this.anchorIdLowerSubstringIndex = anchorIdLowerSubstringIndex;
         }
 
         public boolean isSuffix() {
@@ -277,14 +269,10 @@ public class RicardoFlores {
 
         public void resetData() {
             this.maxMatch = 0;
-            this.anchorIdLowerSubstringIndex = 0;
-            this.anchorIdUpperSubstringIndex = 0;
         }
 
         public void copyDataTo(MatchData otherData) {
             otherData.setMaxMatch(this.maxMatch);
-            otherData.setAnchorIdLowerSubstringIndex(this.anchorIdLowerSubstringIndex);
-            otherData.setAnchorIdUpperSubstringIndex(this.anchorIdUpperSubstringIndex);
             otherData.setSuffix(this.isSuffix);
         }
     }

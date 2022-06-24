@@ -48,7 +48,7 @@ public class CalculatorTests {
         String expectedString = "Neque porro quisquam est," +
                 " qui dolorem ipsum quia dolor sit amet," +
                 " consectetur, adipisci velit," +
-                " sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem. ";
+                " sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.";
         String inputString= "m quaerat voluptatem.;pora incidunt ut labore et d;, " +
                 "consectetur, adipisci velit;olore magnam aliqua;idunt ut labore et dolore " +
                 "magn;uptatem.;i dolorem ipsum qu;iquam quaerat vol;psum quia dolor sit amet, " +
